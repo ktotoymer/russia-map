@@ -9,9 +9,18 @@ COPY package*.json ./
 # Install dependencies
 RUN npm install
 
-# Copy source code
+# Copy source code and public files
+# Copy both directories to ensure they're in the build context
 COPY src ./src
 COPY public ./public
+
+# Verify required files exist before build
+RUN echo "Checking public directory contents:" && \
+    ls -la /app/public/ && \
+    echo "Checking for index.html:" && \
+    test -f /app/public/index.html && echo "✓ index.html found" || (echo "✗ ERROR: index.html not found in public directory" && exit 1) && \
+    echo "Checking src directory:" && \
+    ls -la /app/src/ | head -5
 
 # Build the application
 RUN npm run build
