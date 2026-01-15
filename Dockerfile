@@ -12,6 +12,7 @@ RUN npm install
 # Copy source code and public files
 # Copy both directories to ensure they're in the build context
 COPY src ./src
+COPY public ./public
 
 # Verify required files exist before build
 RUN echo "Checking public directory contents:" && \
