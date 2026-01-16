@@ -555,17 +555,12 @@ const RussiaMap = ({ onRegionClick, selectedRegions, geoData, regionsData, regio
     
     const pathGenerator = d3.geoPath().projection(projection);
 
-    // Фильтруем регионы: показываем только те, которые есть в БД
-    const filteredFeatures = regionsWithData && regionsWithData.length > 0
-      ? geoData.features.filter(feature => regionsWithData.includes(feature.properties.NAME_1))
-      : [];
+    // Показываем все регионы из GeoJSON
+    const allFeatures = geoData.features || [];
 
-    console.log('Filtered features count:', filteredFeatures.length);
-    if (filteredFeatures.length === 0 && regionsWithData.length > 0) {
-      console.warn('No matching regions found! GeoJSON keys:', geoJsonRegionKeys.slice(0, 5), 'DB keys:', regionsWithData.slice(0, 5));
-    }
+    console.log('Total features count:', allFeatures.length);
 
-    return filteredFeatures.map((feature, index) => {
+    return allFeatures.map((feature, index) => {
       const regionKey = feature.properties.NAME_1;
       const pathData = pathGenerator(feature);
       const centroid = pathGenerator.centroid(feature);
@@ -758,7 +753,7 @@ const App = () => {
 
   // Автоматический расчет начального масштаба и позиции для отображения всех регионов
   useEffect(() => {
-    if (!geoData || regionsWithData.length === 0 || !mapRef.current) {
+    if (!geoData || !geoData.features || geoData.features.length === 0 || !mapRef.current) {
       return;
     }
 
@@ -786,16 +781,14 @@ const App = () => {
 
       const pathGenerator = d3.geoPath().projection(projection);
 
-      // Находим все регионы с данными
-      const featuresWithData = geoData.features.filter(f =>
-        regionsWithData.includes(f.properties.NAME_1)
-      );
+      // Используем все регионы для центрирования
+      const allFeatures = geoData.features || [];
 
-      if (featuresWithData.length > 0) {
+      if (allFeatures.length > 0) {
         // Вычисляем общий bounding box для всех регионов
         let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
 
-        featuresWithData.forEach(feature => {
+        allFeatures.forEach(feature => {
           const bounds = pathGenerator.bounds(feature);
           minX = Math.min(minX, bounds[0][0]);
           minY = Math.min(minY, bounds[0][1]);
@@ -827,11 +820,11 @@ const App = () => {
     requestAnimationFrame(() => {
       requestAnimationFrame(calculateInitialTransform);
     });
-  }, [geoData, regionsWithData]);
+  }, [geoData]);
 
   // Обработчик изменения размеров окна для пересчета центрирования
   useEffect(() => {
-    if (!geoData || regionsWithData.length === 0) {
+    if (!geoData || !geoData.features || geoData.features.length === 0) {
       return;
     }
 
@@ -860,16 +853,14 @@ const App = () => {
 
         const pathGenerator = d3.geoPath().projection(projection);
 
-        // Находим все регионы с данными
-        const featuresWithData = geoData.features.filter(f =>
-          regionsWithData.includes(f.properties.NAME_1)
-        );
+        // Используем все регионы для центрирования
+        const allFeatures = geoData.features || [];
 
-        if (featuresWithData.length > 0) {
+        if (allFeatures.length > 0) {
           // Вычисляем общий bounding box для всех регионов
           let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
 
-          featuresWithData.forEach(feature => {
+          allFeatures.forEach(feature => {
             const bounds = pathGenerator.bounds(feature);
             minX = Math.min(minX, bounds[0][0]);
             minY = Math.min(minY, bounds[0][1]);
@@ -903,7 +894,7 @@ const App = () => {
       window.removeEventListener('resize', handleResize);
       clearTimeout(resizeTimeout);
     };
-  }, [geoData, regionsWithData]);
+  }, [geoData]);
 
   const handleRegionClick = (regionKey, centroid, bounds, event) => {
     // Проверяем, нажат ли Shift
