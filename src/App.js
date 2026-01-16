@@ -469,8 +469,7 @@ const RussiaMap = ({ onRegionClick, selectedRegions, geoData, regionsData, regio
     
     // Поддержка разных браузеров и Windows
     const deltaY = e.deltaY !== undefined ? e.deltaY : (e.wheelDelta ? -e.wheelDelta / 3 : 0);
-    // Увеличенный коэффициент для более быстрого зума
-    const delta = deltaY * -0.003;
+    const delta = deltaY * -0.001;
     
     if (setMapTransform) {
       // Используем функциональную форму для получения актуальных значений
@@ -626,11 +625,10 @@ const RussiaMap = ({ onRegionClick, selectedRegions, geoData, regionsData, regio
         width="100%"
         height="100%"
         viewBox="0 0 1200 800"
-        preserveAspectRatio="xMidYMid meet"
         style={{ display: 'block' }}
       >
         <rect width="1200" height="800" fill="#e9ecef" />
-        <g transform={`translate(${transform.x}, ${transform.y}) scale(${transform.scale})`}>
+        <g transform={`translate(${transform.x}, ${transform.y}) scale(${transform.scale})`} style={{ transition: 'transform 0.6s ease-out' }}>
           {paths.map(({ index, regionKey, pathData, centroid, bounds, data }) => {
             const isSelected = selectedRegions && selectedRegions.includes(regionKey);
             const isHovered = hoveredRegion === regionKey;
@@ -778,11 +776,6 @@ const App = () => {
       // Используем фиксированные размеры SVG для проекции (viewBox="0 0 1200 800")
       const svgWidth = 1200;
       const svgHeight = 800;
-      
-      // Вычисляем масштаб для адаптации SVG к реальному размеру контейнера
-      const svgScaleX = containerWidth / svgWidth;
-      const svgScaleY = containerHeight / svgHeight;
-      const svgScale = Math.min(svgScaleX, svgScaleY);
 
       // Используем фиксированные размеры для проекции d3
       const projection = d3.geoMercator()
@@ -813,19 +806,16 @@ const App = () => {
         const centerY = (minY + maxY) / 2;
         
         // Вычисляем оптимальный scale с отступами (в координатах SVG)
-        // Увеличиваем padding, чтобы вся карта была видна с запасом
-        const padding = 0.2; // 20% отступы с каждой стороны для гарантии видимости всей карты
+        const padding = 0.15; // 15% отступы с каждой стороны
         const scaleX = (svgWidth * (1 - padding * 2)) / regionWidth;
         const scaleY = (svgHeight * (1 - padding * 2)) / regionHeight;
         // Используем минимальный масштаб, чтобы вся карта поместилась
         const optimalScale = Math.min(scaleX, scaleY);
         // Убеждаемся, что масштаб позволяет увидеть всю карту
-        // Максимальный масштаб ограничен, чтобы карта не была слишком крупной
-        const initialScale = Math.max(0.2, Math.min(optimalScale, 1.2));
-        
+        const initialScale = Math.max(0.3, Math.min(optimalScale, 1.3));
+
         // Центрируем все регионы в координатах SVG
         // В SVG transform="translate(x, y) scale(s)" сначала translate, потом scale
-        // Порядок: сначала все координаты сдвигаются на (x, y), потом масштабируются
         // Чтобы центр карты (centerX, centerY) оказался в центре SVG после transform:
         // (centerX + initialX) * initialScale = svgWidth / 2
         // Отсюда: initialX = (svgWidth / 2) / initialScale - centerX
@@ -873,16 +863,16 @@ const App = () => {
           .center([100, 65])
           .scale(600)
           .translate([svgWidth / 2, svgHeight / 2]);
-
+      
         const pathGenerator = d3.geoPath().projection(projection);
-
+      
         // Используем все регионы для центрирования
         const allFeatures = geoData.features || [];
-
+      
         if (allFeatures.length > 0) {
           // Вычисляем общий bounding box для всех регионов в координатах SVG
           let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-
+        
           allFeatures.forEach(feature => {
             const bounds = pathGenerator.bounds(feature);
             minX = Math.min(minX, bounds[0][0]);
@@ -890,21 +880,20 @@ const App = () => {
             maxX = Math.max(maxX, bounds[1][0]);
             maxY = Math.max(maxY, bounds[1][1]);
           });
-
+        
           const regionWidth = maxX - minX;
           const regionHeight = maxY - minY;
           const centerX = (minX + maxX) / 2;
           const centerY = (minY + maxY) / 2;
-
+        
           // Вычисляем оптимальный scale с отступами (в координатах SVG)
-          const padding = 0.2; // 20% отступы с каждой стороны
+          const padding = 0.15; // 15% отступы с каждой стороны
           const scaleX = (svgWidth * (1 - padding * 2)) / regionWidth;
           const scaleY = (svgHeight * (1 - padding * 2)) / regionHeight;
           const optimalScale = Math.min(scaleX, scaleY);
-          const newScale = Math.max(0.2, Math.min(optimalScale, 1.2));
-
+          const newScale = Math.max(0.3, Math.min(optimalScale, 1.3));
+        
           // Центрируем все регионы в координатах SVG
-          // Формула: (centerX + newX) * newScale = svgWidth / 2
           const newX = (svgWidth / 2) / newScale - centerX;
           const newY = (svgHeight / 2) / newScale - centerY;
 
