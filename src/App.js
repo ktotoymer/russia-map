@@ -813,11 +813,15 @@ const App = () => {
         const centerY = (minY + maxY) / 2;
         
         // Вычисляем оптимальный scale с отступами (в координатах SVG)
-        const padding = 0.1; // 10% отступы
+        // Увеличиваем padding, чтобы вся карта была видна с запасом
+        const padding = 0.2; // 20% отступы с каждой стороны для гарантии видимости всей карты
         const scaleX = (svgWidth * (1 - padding * 2)) / regionWidth;
         const scaleY = (svgHeight * (1 - padding * 2)) / regionHeight;
-        const optimalScale = Math.min(scaleX, scaleY, 2); // Ограничиваем максимальный зум
-        const initialScale = Math.max(0.5, optimalScale);
+        // Используем минимальный масштаб, чтобы вся карта поместилась
+        const optimalScale = Math.min(scaleX, scaleY);
+        // Убеждаемся, что масштаб позволяет увидеть всю карту
+        // Максимальный масштаб ограничен, чтобы карта не была слишком крупной
+        const initialScale = Math.max(0.2, Math.min(optimalScale, 1.2));
         
         // Центрируем все регионы в координатах SVG
         // В SVG transform="translate(x, y) scale(s)" сначала translate, потом scale
@@ -893,11 +897,11 @@ const App = () => {
           const centerY = (minY + maxY) / 2;
 
           // Вычисляем оптимальный scale с отступами (в координатах SVG)
-          const padding = 0.1; // 10% отступы
+          const padding = 0.2; // 20% отступы с каждой стороны
           const scaleX = (svgWidth * (1 - padding * 2)) / regionWidth;
           const scaleY = (svgHeight * (1 - padding * 2)) / regionHeight;
-          const optimalScale = Math.min(scaleX, scaleY, 2);
-          const newScale = Math.max(0.5, optimalScale);
+          const optimalScale = Math.min(scaleX, scaleY);
+          const newScale = Math.max(0.2, Math.min(optimalScale, 1.2));
 
           // Центрируем все регионы в координатах SVG
           // Формула: (centerX + newX) * newScale = svgWidth / 2
