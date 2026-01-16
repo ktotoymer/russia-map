@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useMemo } from 'react';
+import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import * as d3 from 'd3';
 
@@ -446,32 +446,43 @@ const getRegionColor = (rate) => {
   return `rgb(${red}, ${green}, ${blue})`;
 };
 
-const RussiaMap = ({ onRegionClick, selectedRegions, geoData, regionsData, regionsWithData, mapTransform, setMapTransform }) => {
+const RussiaMap = ({ onRegionClick, selectedRegions, geoData, regionsData, regionsWithData, mapTransform, setMapTransform, mapContainerRef }) => {
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
   const [hoveredRegion, setHoveredRegion] = useState(null);
   const containerRef = useRef(null);
   const svgRef = useRef(null);
   
+  // Используем переданный ref или внутренний
+  const actualContainerRef = mapContainerRef || containerRef;
+  
   const transform = mapTransform || { x: 0, y: 0, scale: 1 };
 
-  const handleWheel = (e) => {
+  const handleWheel = useCallback((e) => {
     e.preventDefault();
-    const rect = containerRef.current.getBoundingClientRect();
+    const container = actualContainerRef.current;
+    if (!container) return;
+    
+    const rect = container.getBoundingClientRect();
     const mouseX = e.clientX - rect.left;
     const mouseY = e.clientY - rect.top;
     
-    const delta = e.deltaY * -0.001;
-    const newScale = Math.min(Math.max(0.5, transform.scale + delta * transform.scale), 5);
-    
-    const scaleRatio = newScale / transform.scale;
-    const newX = mouseX - (mouseX - transform.x) * scaleRatio;
-    const newY = mouseY - (mouseY - transform.y) * scaleRatio;
+    // Поддержка разных браузеров и Windows
+    const deltaY = e.deltaY !== undefined ? e.deltaY : (e.wheelDelta ? -e.wheelDelta / 3 : 0);
+    const delta = deltaY * -0.001;
     
     if (setMapTransform) {
-      setMapTransform({ x: newX, y: newY, scale: newScale });
+      // Используем функциональную форму для получения актуальных значений
+      setMapTransform(prev => {
+        const currentScale = prev.scale;
+        const newScale = Math.min(Math.max(0.5, currentScale + delta * currentScale), 5);
+        const scaleRatio = newScale / currentScale;
+        const newX = mouseX - (mouseX - prev.x) * scaleRatio;
+        const newY = mouseY - (mouseY - prev.y) * scaleRatio;
+        return { x: newX, y: newY, scale: newScale };
+      });
     }
-  };
+  }, [setMapTransform]);
 
   const handleMouseDown = (e) => {
     if (e.target.tagName === 'path') return;
@@ -495,12 +506,21 @@ const RussiaMap = ({ onRegionClick, selectedRegions, geoData, regionsData, regio
   };
 
   useEffect(() => {
-    const container = containerRef.current;
+    const container = actualContainerRef.current;
     if (container) {
-      container.addEventListener('wheel', handleWheel, { passive: false });
-      return () => container.removeEventListener('wheel', handleWheel);
+      // Для Windows: используем разные варианты обработки событий
+      const wheelOptions = { passive: false };
+      container.addEventListener('wheel', handleWheel, wheelOptions);
+      // Fallback для старых браузеров
+      if (window.navigator.userAgent.indexOf('MSIE') !== -1 || window.navigator.userAgent.indexOf('Trident') !== -1) {
+        container.addEventListener('mousewheel', handleWheel, wheelOptions);
+      }
+      return () => {
+        container.removeEventListener('wheel', handleWheel);
+        container.removeEventListener('mousewheel', handleWheel);
+      };
     }
-  }, [transform.scale, transform.x, transform.y]);
+  }, [handleWheel]);
 
   const paths = useMemo(() => {
     if (!geoData || !geoData.features) {
@@ -515,8 +535,18 @@ const RussiaMap = ({ onRegionClick, selectedRegions, geoData, regionsData, regio
     const geoJsonRegionKeys = geoData.features.map(f => f.properties.NAME_1);
     console.log('Sample GeoJSON region keys:', geoJsonRegionKeys.slice(0, 10));
 
-    const width = 1200;
-    const height = 800;
+    // Используем реальные размеры контейнера или значения по умолчанию
+    const container = actualContainerRef.current;
+    let width = 1200;
+    let height = 800;
+    
+    if (container) {
+      const rect = container.getBoundingClientRect();
+      if (rect.width > 0 && rect.height > 0) {
+        width = rect.width;
+        height = rect.height;
+      }
+    }
     
     const projection = d3.geoMercator()
       .center([100, 65])
@@ -556,7 +586,7 @@ const RussiaMap = ({ onRegionClick, selectedRegions, geoData, regionsData, regio
         data: regionsData?.[regionKey] || null
       };
     });
-  }, [geoData, regionsData, regionsWithData]);
+  }, [geoData, regionsData, regionsWithData, actualContainerRef]);
 
   if (!paths) {
     return (
@@ -571,7 +601,18 @@ const RussiaMap = ({ onRegionClick, selectedRegions, geoData, regionsData, regio
 
   return (
     <div 
-      ref={containerRef}
+      ref={(node) => {
+        // Устанавливаем ref для внутреннего использования
+        containerRef.current = node;
+        // Если передан внешний ref, устанавливаем его тоже
+        if (mapContainerRef) {
+          if (typeof mapContainerRef === 'function') {
+            mapContainerRef(node);
+          } else {
+            mapContainerRef.current = node;
+          }
+        }
+      }}
       style={{ 
         width: '100%', 
         height: '100%', 
@@ -717,31 +758,43 @@ const App = () => {
 
   // Автоматический расчет начального масштаба и позиции для отображения всех регионов
   useEffect(() => {
-    if (geoData && regionsWithData.length > 0 && mapRef.current) {
+    if (!geoData || regionsWithData.length === 0 || !mapRef.current) {
+      return;
+    }
+
+    // Используем requestAnimationFrame для гарантии, что DOM готов и размеры вычислены
+    const calculateInitialTransform = () => {
       const container = mapRef.current;
+      if (!container) return;
+
       const rect = container.getBoundingClientRect();
       const containerWidth = rect.width;
       const containerHeight = rect.height;
-      
-      // Создаем временную проекцию для расчета bounds всех регионов
-      const width = 1200;
-      const height = 800;
+
+      // Проверяем, что контейнер имеет валидные размеры
+      if (containerWidth <= 0 || containerHeight <= 0) {
+        // Повторяем попытку через небольшую задержку
+        setTimeout(calculateInitialTransform, 100);
+        return;
+      }
+
+      // Используем реальные размеры контейнера для проекции
       const projection = d3.geoMercator()
         .center([100, 65])
         .scale(600)
-        .translate([width / 2, height / 2]);
-      
+        .translate([containerWidth / 2, containerHeight / 2]);
+
       const pathGenerator = d3.geoPath().projection(projection);
-      
+
       // Находим все регионы с данными
-      const featuresWithData = geoData.features.filter(f => 
+      const featuresWithData = geoData.features.filter(f =>
         regionsWithData.includes(f.properties.NAME_1)
       );
-      
+
       if (featuresWithData.length > 0) {
         // Вычисляем общий bounding box для всех регионов
         let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-        
+
         featuresWithData.forEach(feature => {
           const bounds = pathGenerator.bounds(feature);
           minX = Math.min(minX, bounds[0][0]);
@@ -749,26 +802,107 @@ const App = () => {
           maxX = Math.max(maxX, bounds[1][0]);
           maxY = Math.max(maxY, bounds[1][1]);
         });
-        
+
         const regionWidth = maxX - minX;
         const regionHeight = maxY - minY;
         const centerX = (minX + maxX) / 2;
         const centerY = (minY + maxY) / 2;
-        
+
         // Вычисляем оптимальный scale с отступами
         const padding = 0.1; // 10% отступы
         const scaleX = (containerWidth * (1 - padding * 2)) / regionWidth;
         const scaleY = (containerHeight * (1 - padding * 2)) / regionHeight;
         const optimalScale = Math.min(scaleX, scaleY, 2); // Ограничиваем максимальный зум
         const initialScale = Math.max(0.5, optimalScale);
-        
+
         // Центрируем все регионы
         const initialX = (containerWidth / 2) - (centerX * initialScale);
         const initialY = (containerHeight / 2) - (centerY * initialScale);
-        
+
         setMapTransform({ x: initialX, y: initialY, scale: initialScale });
       }
+    };
+
+    // Используем requestAnimationFrame для гарантии готовности DOM
+    requestAnimationFrame(() => {
+      requestAnimationFrame(calculateInitialTransform);
+    });
+  }, [geoData, regionsWithData]);
+
+  // Обработчик изменения размеров окна для пересчета центрирования
+  useEffect(() => {
+    if (!geoData || regionsWithData.length === 0) {
+      return;
     }
+
+    let resizeTimeout;
+    const handleResize = () => {
+      // Debounce для оптимизации
+      clearTimeout(resizeTimeout);
+      resizeTimeout = setTimeout(() => {
+        if (!mapRef.current) return;
+
+        const container = mapRef.current;
+        const rect = container.getBoundingClientRect();
+        const containerWidth = rect.width;
+        const containerHeight = rect.height;
+
+        // Проверяем, что контейнер имеет валидные размеры
+        if (containerWidth <= 0 || containerHeight <= 0) {
+          return;
+        }
+
+        // Используем реальные размеры контейнера для проекции
+        const projection = d3.geoMercator()
+          .center([100, 65])
+          .scale(600)
+          .translate([containerWidth / 2, containerHeight / 2]);
+
+        const pathGenerator = d3.geoPath().projection(projection);
+
+        // Находим все регионы с данными
+        const featuresWithData = geoData.features.filter(f =>
+          regionsWithData.includes(f.properties.NAME_1)
+        );
+
+        if (featuresWithData.length > 0) {
+          // Вычисляем общий bounding box для всех регионов
+          let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+
+          featuresWithData.forEach(feature => {
+            const bounds = pathGenerator.bounds(feature);
+            minX = Math.min(minX, bounds[0][0]);
+            minY = Math.min(minY, bounds[0][1]);
+            maxX = Math.max(maxX, bounds[1][0]);
+            maxY = Math.max(maxY, bounds[1][1]);
+          });
+
+          const regionWidth = maxX - minX;
+          const regionHeight = maxY - minY;
+          const centerX = (minX + maxX) / 2;
+          const centerY = (minY + maxY) / 2;
+
+          // Вычисляем оптимальный scale с отступами
+          const padding = 0.1; // 10% отступы
+          const scaleX = (containerWidth * (1 - padding * 2)) / regionWidth;
+          const scaleY = (containerHeight * (1 - padding * 2)) / regionHeight;
+          const optimalScale = Math.min(scaleX, scaleY, 2);
+          const newScale = Math.max(0.5, optimalScale);
+
+          // Центрируем все регионы
+          const newX = (containerWidth / 2) - (centerX * newScale);
+          const newY = (containerHeight / 2) - (centerY * newScale);
+
+          setMapTransform({ x: newX, y: newY, scale: newScale });
+        }
+      }, 150); // Debounce 150ms
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => {
+      window.removeEventListener('resize', handleResize);
+      clearTimeout(resizeTimeout);
+    };
   }, [geoData, regionsWithData]);
 
   const handleRegionClick = (regionKey, centroid, bounds, event) => {
@@ -1497,6 +1631,7 @@ const App = () => {
               regionsWithData={regionsWithData}
               mapTransform={mapTransform}
               setMapTransform={setMapTransform}
+              mapContainerRef={mapRef}
             />
         </div>
 
