@@ -820,9 +820,13 @@ const App = () => {
         const initialScale = Math.max(0.5, optimalScale);
         
         // Центрируем все регионы в координатах SVG
-        // Центр SVG - это (svgWidth/2, svgHeight/2)
-        const initialX = (svgWidth / 2) - (centerX * initialScale);
-        const initialY = (svgHeight / 2) - (centerY * initialScale);
+        // В SVG transform="translate(x, y) scale(s)" сначала translate, потом scale
+        // Порядок: сначала все координаты сдвигаются на (x, y), потом масштабируются
+        // Чтобы центр карты (centerX, centerY) оказался в центре SVG после transform:
+        // (centerX + initialX) * initialScale = svgWidth / 2
+        // Отсюда: initialX = (svgWidth / 2) / initialScale - centerX
+        const initialX = (svgWidth / 2) / initialScale - centerX;
+        const initialY = (svgHeight / 2) / initialScale - centerY;
         
         setMapTransform({ x: initialX, y: initialY, scale: initialScale });
       }
@@ -896,8 +900,9 @@ const App = () => {
           const newScale = Math.max(0.5, optimalScale);
 
           // Центрируем все регионы в координатах SVG
-          const newX = (svgWidth / 2) - (centerX * newScale);
-          const newY = (svgHeight / 2) - (centerY * newScale);
+          // Формула: (centerX + newX) * newScale = svgWidth / 2
+          const newX = (svgWidth / 2) / newScale - centerX;
+          const newY = (svgHeight / 2) / newScale - centerY;
 
           setMapTransform({ x: newX, y: newY, scale: newScale });
         }
