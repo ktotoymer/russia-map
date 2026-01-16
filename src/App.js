@@ -826,11 +826,24 @@ const App = () => {
 
         // Центрируем все регионы в координатах SVG
         // В SVG transform="translate(x, y) scale(s)" сначала translate, потом scale
-        // Чтобы центр карты (centerX, centerY) оказался в центре SVG после transform:
+        // Порядок операций: сначала все координаты сдвигаются на (x, y), потом масштабируются
+        // Чтобы центр карты (centerX, centerY) оказался в центре SVG (svgWidth/2, svgHeight/2) после transform:
         // (centerX + initialX) * initialScale = svgWidth / 2
         // Отсюда: initialX = (svgWidth / 2) / initialScale - centerX
-        const initialX = (svgWidth / 2) / initialScale - centerX;
-        const initialY = (svgHeight / 2) / initialScale - centerY;
+        // Но нужно учесть, что scale применяется относительно начала координат (0,0)
+        // Правильная формула: initialX = svgWidth / (2 * initialScale) - centerX
+        const initialX = svgWidth / (2 * initialScale) - centerX;
+        const initialY = svgHeight / (2 * initialScale) - centerY;
+        
+        // Отладочный вывод для проверки расчетов
+        console.log('Map centering:', {
+          bounds: { minX, minY, maxX, maxY },
+          center: { centerX, centerY },
+          regionSize: { regionWidth, regionHeight },
+          scale: initialScale,
+          transform: { initialX, initialY },
+          svgSize: { svgWidth, svgHeight }
+        });
         
         setMapTransform({ x: initialX, y: initialY, scale: initialScale });
       }
@@ -904,8 +917,8 @@ const App = () => {
           const newScale = Math.max(0.3, Math.min(optimalScale, 1.3));
         
           // Центрируем все регионы в координатах SVG
-          const newX = (svgWidth / 2) / newScale - centerX;
-          const newY = (svgHeight / 2) / newScale - centerY;
+          const newX = svgWidth / (2 * newScale) - centerX;
+          const newY = svgHeight / (2 * newScale) - centerY;
 
           setMapTransform({ x: newX, y: newY, scale: newScale });
         }
