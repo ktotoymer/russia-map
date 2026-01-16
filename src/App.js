@@ -795,20 +795,16 @@ const App = () => {
       
       const pathGenerator = d3.geoPath().projection(projection);
       
-      // Используем все регионы для центрирования
-      const allFeatures = geoData.features || [];
-
-      if (allFeatures.length > 0) {
-        // Вычисляем общий bounding box для всех регионов в координатах SVG
-        let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-        
-        allFeatures.forEach(feature => {
-          const bounds = pathGenerator.bounds(feature);
-          minX = Math.min(minX, bounds[0][0]);
-          minY = Math.min(minY, bounds[0][1]);
-          maxX = Math.max(maxX, bounds[1][0]);
-          maxY = Math.max(maxY, bounds[1][1]);
-        });
+      // Находим Красноярский край для центрирования
+      const krasnoyarskFeature = geoData.features.find(f => f.properties.NAME_1 === 'Krasnoyarsk');
+      
+      if (krasnoyarskFeature) {
+        // Используем bounds Красноярского края для центрирования
+        const bounds = pathGenerator.bounds(krasnoyarskFeature);
+        const minX = bounds[0][0];
+        const minY = bounds[0][1];
+        const maxX = bounds[1][0];
+        const maxY = bounds[1][1];
         
         const regionWidth = maxX - minX;
         const regionHeight = maxY - minY;
@@ -856,6 +852,32 @@ const App = () => {
         });
         
         setMapTransform({ x: initialX, y: initialY, scale: initialScale });
+      } else {
+        console.warn('Krasnoyarsk region not found in GeoJSON, using all regions as fallback');
+        // Fallback: используем все регионы, если Красноярский край не найден
+        const allFeatures = geoData.features || [];
+        if (allFeatures.length > 0) {
+          let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+          allFeatures.forEach(feature => {
+            const bounds = pathGenerator.bounds(feature);
+            minX = Math.min(minX, bounds[0][0]);
+            minY = Math.min(minY, bounds[0][1]);
+            maxX = Math.max(maxX, bounds[1][0]);
+            maxY = Math.max(maxY, bounds[1][1]);
+          });
+          const regionWidth = maxX - minX;
+          const regionHeight = maxY - minY;
+          const centerX = (minX + maxX) / 2;
+          const centerY = (minY + maxY) / 2;
+          const padding = 0.15;
+          const scaleX = (svgWidth * (1 - padding * 2)) / regionWidth;
+          const scaleY = (svgHeight * (1 - padding * 2)) / regionHeight;
+          const optimalScale = Math.min(scaleX, scaleY);
+          const initialScale = Math.max(0.3, Math.min(optimalScale, 1.3));
+          const initialX = svgWidth / (2 * initialScale) - centerX;
+          const initialY = svgHeight / (2 * initialScale) - centerY;
+          setMapTransform({ x: initialX, y: initialY, scale: initialScale });
+        }
       }
     };
 
@@ -899,25 +921,21 @@ const App = () => {
       
         const pathGenerator = d3.geoPath().projection(projection);
       
-        // Используем все регионы для центрирования
-        const allFeatures = geoData.features || [];
+      // Находим Красноярский край для центрирования карты
+      const krasnoyarskFeature = geoData.features.find(f => f.properties.NAME_1 === 'Krasnoyarsk');
       
-        if (allFeatures.length > 0) {
-          // Вычисляем общий bounding box для всех регионов в координатах SVG
-          let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+      if (krasnoyarskFeature) {
+        // Используем bounds Красноярского края для центрирования
+        const bounds = pathGenerator.bounds(krasnoyarskFeature);
+        const minX = bounds[0][0];
+        const minY = bounds[0][1];
+        const maxX = bounds[1][0];
+        const maxY = bounds[1][1];
         
-          allFeatures.forEach(feature => {
-            const bounds = pathGenerator.bounds(feature);
-            minX = Math.min(minX, bounds[0][0]);
-            minY = Math.min(minY, bounds[0][1]);
-            maxX = Math.max(maxX, bounds[1][0]);
-            maxY = Math.max(maxY, bounds[1][1]);
-          });
-        
-          const regionWidth = maxX - minX;
-          const regionHeight = maxY - minY;
-          const centerX = (minX + maxX) / 2;
-          const centerY = (minY + maxY) / 2;
+        const regionWidth = maxX - minX;
+        const regionHeight = maxY - minY;
+        const centerX = (minX + maxX) / 2;
+        const centerY = (minY + maxY) / 2;
         
           // Вычисляем оптимальный scale с отступами (в координатах SVG)
           const padding = 0.15; // 15% отступы с каждой стороны
@@ -931,6 +949,31 @@ const App = () => {
           const newY = svgHeight / (2 * newScale) - centerY;
 
           setMapTransform({ x: newX, y: newY, scale: newScale });
+        } else {
+          // Fallback: используем все регионы, если Красноярский край не найден
+          const allFeatures = geoData.features || [];
+          if (allFeatures.length > 0) {
+            let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+            allFeatures.forEach(feature => {
+              const bounds = pathGenerator.bounds(feature);
+              minX = Math.min(minX, bounds[0][0]);
+              minY = Math.min(minY, bounds[0][1]);
+              maxX = Math.max(maxX, bounds[1][0]);
+              maxY = Math.max(maxY, bounds[1][1]);
+            });
+            const regionWidth = maxX - minX;
+            const regionHeight = maxY - minY;
+            const centerX = (minX + maxX) / 2;
+            const centerY = (minY + maxY) / 2;
+            const padding = 0.15;
+            const scaleX = (svgWidth * (1 - padding * 2)) / regionWidth;
+            const scaleY = (svgHeight * (1 - padding * 2)) / regionHeight;
+            const optimalScale = Math.min(scaleX, scaleY);
+            const newScale = Math.max(0.3, Math.min(optimalScale, 1.3));
+            const newX = svgWidth / (2 * newScale) - centerX;
+            const newY = svgHeight / (2 * newScale) - centerY;
+            setMapTransform({ x: newX, y: newY, scale: newScale });
+          }
         }
       }, 150); // Debounce 150ms
     };
