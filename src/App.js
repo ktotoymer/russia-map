@@ -469,7 +469,8 @@ const RussiaMap = ({ onRegionClick, selectedRegions, geoData, regionsData, regio
     
     // Поддержка разных браузеров и Windows
     const deltaY = e.deltaY !== undefined ? e.deltaY : (e.wheelDelta ? -e.wheelDelta / 3 : 0);
-    const delta = deltaY * -0.001;
+    // Увеличенный коэффициент для более быстрого зума
+    const delta = deltaY * -0.003;
     
     if (setMapTransform) {
       // Используем функциональную форму для получения актуальных значений
