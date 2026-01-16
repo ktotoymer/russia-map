@@ -450,6 +450,7 @@ const RussiaMap = ({ onRegionClick, selectedRegions, geoData, regionsData, regio
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
   const [hoveredRegion, setHoveredRegion] = useState(null);
+  const [isInitialized, setIsInitialized] = useState(false);
   const containerRef = useRef(null);
   const svgRef = useRef(null);
   
@@ -521,6 +522,14 @@ const RussiaMap = ({ onRegionClick, selectedRegions, geoData, regionsData, regio
       };
     }
   }, [handleWheel]);
+
+  // Отслеживаем инициализацию карты
+  useEffect(() => {
+    if (mapTransform && mapTransform.scale !== 1 && !isInitialized) {
+      // Небольшая задержка, чтобы transition не применялся при первой загрузке
+      setTimeout(() => setIsInitialized(true), 100);
+    }
+  }, [mapTransform, isInitialized]);
 
   const paths = useMemo(() => {
     if (!geoData || !geoData.features) {
@@ -629,7 +638,7 @@ const RussiaMap = ({ onRegionClick, selectedRegions, geoData, regionsData, regio
         style={{ display: 'block' }}
       >
         <rect width="1200" height="800" fill="#e9ecef" />
-        <g transform={`translate(${transform.x}, ${transform.y}) scale(${transform.scale})`} style={{ transition: 'transform 0.6s ease-out' }}>
+        <g transform={`translate(${transform.x}, ${transform.y}) scale(${transform.scale})`} style={{ transition: isInitialized ? 'transform 0.3s ease-out' : 'none' }}>
           {paths.map(({ index, regionKey, pathData, centroid, bounds, data }) => {
             const isSelected = selectedRegions && selectedRegions.includes(regionKey);
             const isHovered = hoveredRegion === regionKey;
