@@ -625,6 +625,7 @@ const RussiaMap = ({ onRegionClick, selectedRegions, geoData, regionsData, regio
         width="100%"
         height="100%"
         viewBox="0 0 1200 800"
+        preserveAspectRatio="xMidYMid meet"
         style={{ display: 'block' }}
       >
         <rect width="1200" height="800" fill="#e9ecef" />
