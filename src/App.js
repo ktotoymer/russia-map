@@ -625,10 +625,11 @@ const RussiaMap = ({ onRegionClick, selectedRegions, geoData, regionsData, regio
         width="100%"
         height="100%"
         viewBox="0 0 1200 800"
+        preserveAspectRatio="xMidYMid meet"
         style={{ display: 'block' }}
       >
         <rect width="1200" height="800" fill="#e9ecef" />
-        <g transform={`translate(${transform.x}, ${transform.y}) scale(${transform.scale})`} style={{ transition: 'transform 0.6s ease-out' }}>
+        <g transform={`translate(${transform.x}, ${transform.y}) scale(${transform.scale})`}>
           {paths.map(({ index, regionKey, pathData, centroid, bounds, data }) => {
             const isSelected = selectedRegions && selectedRegions.includes(regionKey);
             const isHovered = hoveredRegion === regionKey;
@@ -765,7 +766,7 @@ const App = () => {
       const rect = container.getBoundingClientRect();
       const containerWidth = rect.width;
       const containerHeight = rect.height;
-
+      
       // Проверяем, что контейнер имеет валидные размеры
       if (containerWidth <= 0 || containerHeight <= 0) {
         // Повторяем попытку через небольшую задержку
@@ -773,21 +774,30 @@ const App = () => {
         return;
       }
 
-      // Используем реальные размеры контейнера для проекции
+      // Используем фиксированные размеры SVG для проекции (viewBox="0 0 1200 800")
+      const svgWidth = 1200;
+      const svgHeight = 800;
+      
+      // Вычисляем масштаб для адаптации SVG к реальному размеру контейнера
+      const svgScaleX = containerWidth / svgWidth;
+      const svgScaleY = containerHeight / svgHeight;
+      const svgScale = Math.min(svgScaleX, svgScaleY);
+
+      // Используем фиксированные размеры для проекции d3
       const projection = d3.geoMercator()
         .center([100, 65])
         .scale(600)
-        .translate([containerWidth / 2, containerHeight / 2]);
-
+        .translate([svgWidth / 2, svgHeight / 2]);
+      
       const pathGenerator = d3.geoPath().projection(projection);
-
+      
       // Используем все регионы для центрирования
       const allFeatures = geoData.features || [];
 
       if (allFeatures.length > 0) {
-        // Вычисляем общий bounding box для всех регионов
+        // Вычисляем общий bounding box для всех регионов в координатах SVG
         let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-
+        
         allFeatures.forEach(feature => {
           const bounds = pathGenerator.bounds(feature);
           minX = Math.min(minX, bounds[0][0]);
@@ -795,23 +805,24 @@ const App = () => {
           maxX = Math.max(maxX, bounds[1][0]);
           maxY = Math.max(maxY, bounds[1][1]);
         });
-
+        
         const regionWidth = maxX - minX;
         const regionHeight = maxY - minY;
         const centerX = (minX + maxX) / 2;
         const centerY = (minY + maxY) / 2;
-
-        // Вычисляем оптимальный scale с отступами
+        
+        // Вычисляем оптимальный scale с отступами (в координатах SVG)
         const padding = 0.1; // 10% отступы
-        const scaleX = (containerWidth * (1 - padding * 2)) / regionWidth;
-        const scaleY = (containerHeight * (1 - padding * 2)) / regionHeight;
+        const scaleX = (svgWidth * (1 - padding * 2)) / regionWidth;
+        const scaleY = (svgHeight * (1 - padding * 2)) / regionHeight;
         const optimalScale = Math.min(scaleX, scaleY, 2); // Ограничиваем максимальный зум
         const initialScale = Math.max(0.5, optimalScale);
-
-        // Центрируем все регионы
-        const initialX = (containerWidth / 2) - (centerX * initialScale);
-        const initialY = (containerHeight / 2) - (centerY * initialScale);
-
+        
+        // Центрируем все регионы в координатах SVG
+        // Центр SVG - это (svgWidth/2, svgHeight/2)
+        const initialX = (svgWidth / 2) - (centerX * initialScale);
+        const initialY = (svgHeight / 2) - (centerY * initialScale);
+        
         setMapTransform({ x: initialX, y: initialY, scale: initialScale });
       }
     };
@@ -845,11 +856,14 @@ const App = () => {
           return;
         }
 
-        // Используем реальные размеры контейнера для проекции
+        // Используем фиксированные размеры SVG для проекции (viewBox="0 0 1200 800")
+        const svgWidth = 1200;
+        const svgHeight = 800;
+
         const projection = d3.geoMercator()
           .center([100, 65])
           .scale(600)
-          .translate([containerWidth / 2, containerHeight / 2]);
+          .translate([svgWidth / 2, svgHeight / 2]);
 
         const pathGenerator = d3.geoPath().projection(projection);
 
@@ -857,7 +871,7 @@ const App = () => {
         const allFeatures = geoData.features || [];
 
         if (allFeatures.length > 0) {
-          // Вычисляем общий bounding box для всех регионов
+          // Вычисляем общий bounding box для всех регионов в координатах SVG
           let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
 
           allFeatures.forEach(feature => {
@@ -873,16 +887,16 @@ const App = () => {
           const centerX = (minX + maxX) / 2;
           const centerY = (minY + maxY) / 2;
 
-          // Вычисляем оптимальный scale с отступами
+          // Вычисляем оптимальный scale с отступами (в координатах SVG)
           const padding = 0.1; // 10% отступы
-          const scaleX = (containerWidth * (1 - padding * 2)) / regionWidth;
-          const scaleY = (containerHeight * (1 - padding * 2)) / regionHeight;
+          const scaleX = (svgWidth * (1 - padding * 2)) / regionWidth;
+          const scaleY = (svgHeight * (1 - padding * 2)) / regionHeight;
           const optimalScale = Math.min(scaleX, scaleY, 2);
           const newScale = Math.max(0.5, optimalScale);
 
-          // Центрируем все регионы
-          const newX = (containerWidth / 2) - (centerX * newScale);
-          const newY = (containerHeight / 2) - (centerY * newScale);
+          // Центрируем все регионы в координатах SVG
+          const newX = (svgWidth / 2) - (centerX * newScale);
+          const newY = (svgHeight / 2) - (centerY * newScale);
 
           setMapTransform({ x: newX, y: newY, scale: newScale });
         }
