@@ -825,24 +825,34 @@ const App = () => {
         const initialScale = Math.max(0.3, Math.min(optimalScale, 1.3));
 
         // Центрируем все регионы в координатах SVG
-        // В SVG transform="translate(x, y) scale(s)" сначала translate, потом scale
-        // Порядок операций: сначала все координаты сдвигаются на (x, y), потом масштабируются
-        // Чтобы центр карты (centerX, centerY) оказался в центре SVG (svgWidth/2, svgHeight/2) после transform:
+        // В SVG transform="translate(x, y) scale(s)" операции применяются в порядке написания:
+        // 1. translate(x, y) - сдвигает все координаты
+        // 2. scale(s) - масштабирует относительно начала координат (0,0)
+        // 
+        // Для точки (centerX, centerY) после transform:
+        // После translate: (centerX + initialX, centerY + initialY)
+        // После scale: ((centerX + initialX) * initialScale, (centerY + initialY) * initialScale)
+        //
+        // Мы хотим, чтобы эта точка оказалась в центре viewBox:
         // (centerX + initialX) * initialScale = svgWidth / 2
-        // Отсюда: initialX = (svgWidth / 2) / initialScale - centerX
-        // Но нужно учесть, что scale применяется относительно начала координат (0,0)
-        // Правильная формула: initialX = svgWidth / (2 * initialScale) - centerX
+        // centerX + initialX = svgWidth / (2 * initialScale)
+        // initialX = svgWidth / (2 * initialScale) - centerX
         const initialX = svgWidth / (2 * initialScale) - centerX;
         const initialY = svgHeight / (2 * initialScale) - centerY;
         
         // Отладочный вывод для проверки расчетов
-        console.log('Map centering:', {
-          bounds: { minX, minY, maxX, maxY },
-          center: { centerX, centerY },
-          regionSize: { regionWidth, regionHeight },
-          scale: initialScale,
-          transform: { initialX, initialY },
-          svgSize: { svgWidth, svgHeight }
+        const finalCenterX = (centerX + initialX) * initialScale;
+        const finalCenterY = (centerY + initialY) * initialScale;
+        console.log('Map centering calculation:', {
+          bounds: { minX: minX.toFixed(2), minY: minY.toFixed(2), maxX: maxX.toFixed(2), maxY: maxY.toFixed(2) },
+          center: { centerX: centerX.toFixed(2), centerY: centerY.toFixed(2) },
+          regionSize: { regionWidth: regionWidth.toFixed(2), regionHeight: regionHeight.toFixed(2) },
+          scale: initialScale.toFixed(4),
+          transform: { initialX: initialX.toFixed(2), initialY: initialY.toFixed(2) },
+          svgSize: { svgWidth, svgHeight },
+          expectedCenter: { x: svgWidth / 2, y: svgHeight / 2 },
+          calculatedCenter: { x: finalCenterX.toFixed(2), y: finalCenterY.toFixed(2) },
+          offset: { x: (finalCenterX - svgWidth / 2).toFixed(2), y: (finalCenterY - svgHeight / 2).toFixed(2) }
         });
         
         setMapTransform({ x: initialX, y: initialY, scale: initialScale });
